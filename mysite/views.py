@@ -1,34 +1,37 @@
+import requests
 from django.shortcuts import render, redirect
 from django.contrib import messages
-from . import models, forms
+from django.dispatch import receiver
+from django.db.models.signals import post_save
+
+from . import models
 
 def index(request):
     return render(request, 'index.html')
 
-def blog(request):
-    return render(request, 'blog.html', {})
-
-def blogsingle(request):
-    return render(request, 'blog-single.html', {})
-
-def innerpage(request):
-    return render(request, 'inner-page.html', {})
-
-def portfoliodetail(request):
-    return render(request, 'portfolio-details.html', {})
-
 def contact(request):
-	if request.method == 'POST':
-		c_form 		= forms.Contact_Form(request.POST)
-		if c_form.is_valid():
-			Name 		= request.POST.get('Name','')
-			Email 		= request.POST.get('Email','')
-			Contact		= request.POST.get('Contact','')
-			Message 	= request.POST.get('Message','')
-			form_obj 	= models.Contact_form_model(Name = Name, Email = Email, Contact = Contact,Message = Message)
-			form_obj.save()
-			messages.add_message(request, messages.INFO, "Thank You.. {}".format(Name))
-			return redirect('/')
-		else:
-			messages.add_message(request, messages.INFO, 'Thank You for Giving your Precious Time.')
-			return redirect('/')
+    if request.method == 'POST':
+        Name 		= request.POST.get('Name','')
+        Email 		= request.POST.get('Email','')
+        Contact		= request.POST.get('Contact','')
+        Message 	= request.POST.get('Message','')
+        form_obj 	= models.Contact(name = Name, email = Email, contact = Contact, message = Message)
+        form_obj.save()
+        messages.add_message(request, messages.INFO, f"Thank You.. {Name}")
+    else:
+        messages.add_message(request, messages.INFO, 'Thank You for Giving your Precious Time.')
+    return redirect('/')
+
+
+@receiver(post_save,sender=models.Contact)
+def send_sms(sender, created, **kwargs):
+    obj = kwargs['instance']
+    if created and obj.contact != 0:
+        # Sending SMS
+        sms_content = f"Hello, \nSomeone trying to contact you.\nName: {obj.name}\nContact: {obj.contact}\nEmail: {obj.email}\n\nMessage: {obj.message}"
+
+        my_data = {'sender_id': 'FST2SMS','message': sms_content,'language': 'english','route': 'p','numbers': '7000681073,7415535562'}
+        headers = {'authorization': '6a0iXHGODBECvnVbmSoeYPd5K1Mgl3thUL2zNQp79cJWRfTZFx40eYPvV2SJ1lKXU9Tzp8qGtCsDcuL5',\
+                    'Content-Type': "application/x-www-form-urlencoded",'Cache-Control': "no-cache"}
+        url = "https://www.fast2sms.com/dev/bulk"
+        requests.request("POST",url,data = my_data,headers = headers)
